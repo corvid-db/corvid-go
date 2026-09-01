@@ -37,9 +37,9 @@ Requirements stop at "a C compiler" — which cgo already needs.
 
 ## Quick start
 
-Requirements: Go ≥ 1.22, a C compiler (CGO enabled — the default when
-one is present), `curl` + `shasum`/`sha256sum` (macOS/Linux) or
-PowerShell 5+ (Windows).
+Requirements: Go ≥ 1.26 (CI exercises 1.27.x and 1.26.x), a C compiler
+(CGO enabled — the default when one is present), `curl` +
+`shasum`/`sha256sum` (macOS/Linux) or PowerShell 5+ (Windows).
 
 ```sh
 make deps          # fetch + verify corvid v0.2.1 into deps/current
@@ -162,9 +162,10 @@ go build ./...
 
 ## CI
 
-A linux/macos/windows matrix (`.github/workflows/ci.yml`): fetch +
-verify the pinned artifacts, `go vet`, and `go test ./...` (the golden
-suite) on every leg; golangci-lint on Linux.
+A linux/macos/windows × Go {1.27.x, 1.26.x} matrix
+(`.github/workflows/ci.yml`): fetch + verify the pinned artifacts,
+`go vet`, and `go test ./...` (the golden suite) on every leg;
+golangci-lint on Linux.
 
 ## Versioning
 
