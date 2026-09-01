@@ -46,6 +46,16 @@ make deps          # fetch + verify corvid v0.2.1 into deps/current
 go test ./...      # the golden suite (256 executable lines, 8 fixtures)
 ```
 
+On Windows (PowerShell), `make deps` is `./fetch.ps1`; there is no
+rpath there, so put the cdylib on the DLL search path before building
+or testing:
+
+```powershell
+./fetch.ps1
+$env:PATH = "$(Get-Location)\deps\current;$env:PATH"
+go test ./...
+```
+
 A taste of the API:
 
 ```go

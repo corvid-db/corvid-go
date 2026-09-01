@@ -44,6 +44,13 @@ jobs:
         shell: pwsh
         run: ./fetch.ps1
 
+      # Windows has no rpath: the cdylib must be on the DLL search
+      # path for the test binary to load it.
+      - name: Put corvid.dll on the DLL search path (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "$(Get-Location)\deps\current"
+
       - name: go vet
         run: go vet ./...
 
