@@ -158,6 +158,7 @@ go build ./...
 | `errors.go` / `values.go` / `db.go` / `collection.go` / `query.go` | The idiomatic Go API (Db/Collection/Query/Predicate, the value mapping, the error type) |
 | `golden_test.go` | The golden-suite port — 256 fixture lines through the binding, no softened asserts |
 | `golden/` | The engine's golden fixtures, vendored byte-identical (verified against each release) |
+| `examples/{quickstart,hybrid,vector-index,text-search,graph,geo}/` | The examples tour — one runnable `main.go` per concept, `go run` on every CI leg: the README quickstart, hybrid RRF+MMR, the three vector-index families vs exact, BM25 incl. CJK, graph + delete cascade, geo radius/bbox/nearest |
 | `docs/PLAN.md` | The binding's plan: architecture ruling, lifetime mapping, pointer discipline, phase scope |
 
 ## CI
