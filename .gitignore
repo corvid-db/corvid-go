@@ -1,0 +1,7 @@
+# Fetched engine artifacts — never vendored (docs/PLAN.md binding rules).
+deps/
+
+# Go build output.
+*.test
+*.out
+corvid-go
