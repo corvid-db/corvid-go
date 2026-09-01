@@ -28,7 +28,7 @@ copied under the `libcorvid.dll.a` name so mingw-w64's `ld` finds it).
 Requirements stop at "a C compiler" — which cgo already needs.
 
 - **No Rust toolchain, ever.**
-- **One exact engine pin** — `v0.2.1`, living in one variable per fetch
+- **One exact engine pin** — `v0.2.2`, living in one variable per fetch
   script (`CORVID_VERSION` in `fetch.sh`, `$CorvidVersion` in
   `fetch.ps1`), stamped into `deps/version.txt`.
 - **No vendored binaries in git** (`deps/` is gitignored) and **no
@@ -42,7 +42,7 @@ Requirements: Go ≥ 1.26 (CI exercises 1.27.x and 1.26.x), a C compiler
 `shasum`/`sha256sum` (macOS/Linux) or PowerShell 5+ (Windows).
 
 ```sh
-make deps          # fetch + verify corvid v0.2.1 into deps/current
+make deps          # fetch + verify corvid v0.2.2 into deps/current
 go test ./...      # the golden suite (256 executable lines, 8 fixtures)
 ```
 
@@ -115,9 +115,9 @@ use; `Query`/`Predicate` builders are single-goroutine, build-once,
 consumed-by-the-terminal. `Close` deliberately on every handle; the
 runtime finalizers are backstops only.
 
-## Documents, maps, and the v0.2.1 ABI boundary
+## Documents, maps, and the v0.2.2 ABI boundary
 
-The v0.2.1 C ABI has **no map-key iterator** — a stored map is readable
+The v0.2.2 C ABI has **no map-key iterator** — a stored map is readable
 only by known key. Consequences in this binding (either-correct-or-
 loud, never silently truncated — details in
 [docs/PLAN.md](docs/PLAN.md#the-v1-boundary-map-key-enumeration)):
@@ -168,10 +168,21 @@ A linux/macos/windows × Go {1.27.x, 1.26.x} matrix
 `go vet`, and `go test ./...` (the golden suite) on every leg;
 golangci-lint on Linux.
 
+## Surface manifest (docs/SURFACE.tsv)
+
+Every construct of the engine's public surface (the radar-enforced list the
+engine publishes as `scripts/bindings/surface.tsv` at each release tag) is
+resolved in `docs/SURFACE.tsv`: the Go API exposing it plus the test that
+proves it (golden fixture line references), or `N/A` + reason where the v1
+binding deliberately does not expose it. `scripts/surface-gate.sh` fails CI
+when a line is unresolved, a cell is empty, or the N/A count drifts from the
+committed baseline — so an engine pin bump that changes the surface lands in
+this gate, not in a user's bug report.
+
 ## Versioning
 
 The engine pin lives in one variable in the fetch scripts
-(`CORVID_VERSION=v0.2.1`). Artifacts always come from that exact tag's
+(`CORVID_VERSION=v0.2.2`). Artifacts always come from that exact tag's
 GitHub release and are sha256-verified; `deps/` is never committed.
 
 ## License
