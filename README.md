@@ -113,7 +113,12 @@ Errors are `*corvid.CorvidError` (implements `error` + `Code()`) — Go
 errors, never panics. `Db` and `Collection` are safe for concurrent
 use; `Query`/`Predicate` builders are single-goroutine, build-once,
 consumed-by-the-terminal. `Close` deliberately on every handle; the
-runtime finalizers are backstops only.
+runtime finalizers are backstops only. Concurrent use carries the FFI
+§6 close caveat: **close a `Db`/`Collection` only after every
+concurrent operation on it has completed** — freeing engine memory
+while another thread is inside a call on it is undefined behavior, and
+the binding's closed-handle gate (`checkOpen`) is TOCTOU by design, a
+loud rejection of use-after-close, not a lock.
 
 ## Documents, maps, and the v0.2.2 ABI boundary
 

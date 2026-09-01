@@ -101,24 +101,24 @@ corvid::QueryBuilder::vector	Vector search	MAPPED	Query.Vector	golden:queries.tx
 corvid::QueryBuilder::text	Text search	MAPPED	Query.Text	golden:queries.txt:QTEXT
 corvid::QueryBuilder::fuse_rrf	Hybrid	MAPPED	Query.FuseRRF	golden:queries.txt:HYBRID_F
 corvid::QueryBuilder::rerank_mmr	Hybrid	MAPPED	Query.RerankMMR	golden:queries.txt:HYBRID
-corvid::QueryBuilder::limit	SELECT shaping	MAPPED	Query.limit	golden:queries.txt:ORDER_BY
-corvid::QueryBuilder::offset	SELECT shaping	MAPPED	Query.offset	golden:queries.txt:ORDER_BY
+corvid::QueryBuilder::limit	SELECT shaping	MAPPED	Query.Limit	golden:queries.txt:ORDER_BY
+corvid::QueryBuilder::offset	SELECT shaping	MAPPED	Query.Offset	golden:queries.txt:ORDER_BY
 corvid::QueryBuilder::order_by	SELECT shaping	MAPPED	Query.OrderBy	golden:queries.txt:ORDER_BY
-corvid::QueryBuilder::approx	Vector search	MAPPED	Query.approx	golden:queries.txt:APPROX
-corvid::QueryBuilder::select	SELECT shaping	MAPPED	Query.select	golden:queries.txt:SELECT
-corvid::QueryBuilder::count	Aggregations	MAPPED	Query.count	golden:queries.txt:AGG_COUNT
+corvid::QueryBuilder::approx	Vector search	MAPPED	Query.Approx	golden:queries.txt:APPROX
+corvid::QueryBuilder::select	SELECT shaping	MAPPED	Query.Select	golden:queries.txt:SELECT
+corvid::QueryBuilder::count	Aggregations	MAPPED	Query.Count	golden:queries.txt:AGG_COUNT
 corvid::QueryBuilder::group_count	Aggregations	MAPPED	Query.GroupCount	golden:queries.txt:AGG_GCOUNT
-corvid::QueryBuilder::sum	Aggregations	MAPPED	Query.sum	golden:queries.txt:AGG_SUM
-corvid::QueryBuilder::avg	Aggregations	MAPPED	Query.avg	golden:queries.txt:AGG_AVG
-corvid::QueryBuilder::min	Aggregations	MAPPED	Query.min	golden:queries.txt:AGG_MIN
-corvid::QueryBuilder::max	Aggregations	MAPPED	Query.max	golden:queries.txt:AGG_MAX
+corvid::QueryBuilder::sum	Aggregations	MAPPED	Query.Sum	golden:queries.txt:AGG_SUM
+corvid::QueryBuilder::avg	Aggregations	MAPPED	Query.Avg	golden:queries.txt:AGG_AVG
+corvid::QueryBuilder::min	Aggregations	MAPPED	Query.Min	golden:queries.txt:AGG_MIN
+corvid::QueryBuilder::max	Aggregations	MAPPED	Query.Max	golden:queries.txt:AGG_MAX
 corvid::QueryBuilder::count_distinct	Aggregations	MAPPED	Query.CountDistinct	golden:queries.txt:AGG_DISTINCT
 corvid::QueryBuilder::group_sum	Aggregations	MAPPED	Query.GroupSum	golden:queries.txt:AGG_GSUM
 corvid::QueryBuilder::group_avg	Aggregations	MAPPED	Query.GroupAvg	golden:queries.txt:AGG_GAVG
 corvid::QueryBuilder::plan	Lifecycle	N/A	N/A	plan/explain diagnostics excluded from the v1 ABI (FFI.md §9)
 corvid::QueryBuilder::plan_shape	Lifecycle	N/A	N/A	plan/explain diagnostics excluded from the v1 ABI (FFI.md §9)
 corvid::QueryBuilder::explain	Lifecycle	N/A	N/A	plan/explain diagnostics excluded from the v1 ABI (FFI.md §9)
-corvid::QueryBuilder::run	SELECT shaping	MAPPED	Query.run	golden:queries.txt:QVEC
+corvid::QueryBuilder::run	SELECT shaping	MAPPED	Query.Run	golden:queries.txt:QVEC
 corvid::Db	Lifecycle	MAPPED	Db	golden:admin.txt:FILEDB
 corvid::Db::open	Lifecycle	MAPPED	Db.Open/OpenMemory/Collection/Collections/Backup/Compact	golden:admin.txt (COLLECTIONS/BACKUP/COMPACT)
 corvid::Db::open_in_memory	Lifecycle	MAPPED	Db.Open/OpenMemory/Collection/Collections/Backup/Compact	golden:admin.txt (COLLECTIONS/BACKUP/COMPACT)

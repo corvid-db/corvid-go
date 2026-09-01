@@ -12,7 +12,7 @@
 // Documents in Run rows materialize through Select: a projected row
 // decodes from exactly the selected fields (which never needs the
 // map-key oracle of values.go). Without Select, Row.Doc is nil — the
-// v0.2.1 ABI has no map-key iterator, so this binding refuses to
+// v0.2.2 ABI has no map-key iterator, so this binding refuses to
 // guess; pair with Get/GetFields for point reads (docs/PLAN.md).
 
 package corvid

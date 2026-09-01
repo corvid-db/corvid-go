@@ -224,6 +224,36 @@ func copyBytes(p *C.uint8_t, n C.size_t) []byte {
 	return C.GoBytes(unsafe.Pointer(p), C.int(n))
 }
 
+// cStrTable lays out the ABI's parallel-string shape ((const char **,
+// size_t *) over n entries) for the given Go strings WITHOUT storing a
+// Go pointer in C memory: every string's bytes are first copied into
+// ONE C.malloc'd buffer, and the pointer/length arrays — C.malloc'd
+// too — aim at those C copies (the same discipline as cPutMany /
+// cSetSchema). Each pointer is non-NULL even for an empty string (the
+// §1.5 sentinel; the buffer carries one spare byte so &copy[0] always
+// exists). The caller defers C.free over all three allocations when
+// its engine call returns; len(strs) must be > 0.
+func cStrTable(strs []string) (blob, ptrs, lens unsafe.Pointer) {
+	total := 1 // +1 keeps &buf[off] in-bounds for trailing empty strings
+	for _, s := range strs {
+		total += len(s)
+	}
+	blob = C.malloc(C.size_t(total))
+	ptrs = C.malloc(C.size_t(len(strs)) * C.size_t(unsafe.Sizeof((*C.char)(nil))))
+	lens = C.malloc(C.size_t(len(strs)) * C.size_t(unsafe.Sizeof(C.size_t(0))))
+	buf := (*[1 << 30]byte)(blob)
+	ph := (*[1 << 28]*C.char)(ptrs)[:len(strs):len(strs)]
+	lh := (*[1 << 28]C.size_t)(lens)[:len(strs):len(strs)]
+	off := 0
+	for i, s := range strs {
+		copy(buf[off:off+len(s)], s) // the C copy of this string's bytes
+		ph[i] = (*C.char)(unsafe.Pointer(&buf[off]))
+		lh[i] = C.size_t(len(s))
+		off += len(s)
+	}
+	return blob, ptrs, lens
+}
+
 // ---------------------------------------------------------------------------
 // Error plumbing (FFI.md §3): read the thread-local slot immediately
 // after the failing call, on this goroutine's thread.
@@ -650,18 +680,11 @@ func cQuerySelect(q *cQuery, fields []string) error {
 	if len(fields) == 0 {
 		return cStatusErr(C.corvid_query_select(q.h, nil, nil, 0))
 	}
-	strs := C.malloc(C.size_t(len(fields)) * C.size_t(unsafe.Sizeof((*C.char)(nil))))
-	lens := C.malloc(C.size_t(len(fields)) * C.size_t(unsafe.Sizeof(C.size_t(0))))
-	defer C.free(strs)
+	blob, ptrs, lens := cStrTable(fields)
+	defer C.free(blob)
+	defer C.free(ptrs)
 	defer C.free(lens)
-	shdrs := (*[1 << 28]*C.char)(strs)[:len(fields):len(fields)]
-	lhdrs := (*[1 << 28]C.size_t)(lens)[:len(fields):len(fields)]
-	for i, f := range fields {
-		p, n := cStr(f)
-		shdrs[i] = p
-		lhdrs[i] = n
-	}
-	return cStatusErr(C.corvid_query_select(q.h, (**C.char)(strs), (*C.size_t)(lens), C.size_t(len(fields))))
+	return cStatusErr(C.corvid_query_select(q.h, (**C.char)(ptrs), (*C.size_t)(lens), C.size_t(len(fields))))
 }
 
 // cQueryRun consumes q (even on failure).
@@ -991,6 +1014,9 @@ func cScan(c *cColl, ks *keySet, fn func(key []byte, doc any) bool) error {
 	*(*uintptr)(cell) = id
 	st := C.corvidgo_scan_call(c.h, cell)
 	cbDel(id)
+	if job.panicVal != nil {
+		panic(job.panicVal) // the closure panicked: surface it here, not through C frames
+	}
 	if err := cStatusErr(st); err != nil {
 		return err
 	}
@@ -1040,18 +1066,11 @@ func cCreateCompoundIndex(c *cColl, fields []string) error {
 	if len(fields) == 0 {
 		return cStatusErr(C.corvid_create_compound_index(c.h, nil, nil, 0))
 	}
-	strs := C.malloc(C.size_t(len(fields)) * C.size_t(unsafe.Sizeof((*C.char)(nil))))
-	lens := C.malloc(C.size_t(len(fields)) * C.size_t(unsafe.Sizeof(C.size_t(0))))
-	defer C.free(strs)
+	blob, ptrs, lens := cStrTable(fields)
+	defer C.free(blob)
+	defer C.free(ptrs)
 	defer C.free(lens)
-	shdrs := (*[1 << 28]*C.char)(strs)[:len(fields):len(fields)]
-	lhdrs := (*[1 << 28]C.size_t)(lens)[:len(fields):len(fields)]
-	for i, f := range fields {
-		p, n := cStr(f)
-		shdrs[i] = p
-		lhdrs[i] = n
-	}
-	return cStatusErr(C.corvid_create_compound_index(c.h, (**C.char)(strs), (*C.size_t)(lens), C.size_t(len(fields))))
+	return cStatusErr(C.corvid_create_compound_index(c.h, (**C.char)(ptrs), (*C.size_t)(lens), C.size_t(len(fields))))
 }
 
 func cCreateTextIndex(c *cColl, field string) error {
@@ -1345,30 +1364,22 @@ func cLoadRenames(db *cDB, path string, renames map[string]string) error {
 	if count == 0 {
 		return cStatusErr(C.corvid_load_from_path_with_renames(db.h, p, pn, nil, nil, nil, nil, 0))
 	}
-	olds := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof((*C.char)(nil))))
-	news := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof((*C.char)(nil))))
-	olens := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(C.size_t(0))))
-	nlens := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(C.size_t(0))))
-	defer C.free(olds)
-	defer C.free(news)
-	defer C.free(olens)
-	defer C.free(nlens)
-	ohdrs := (*[1 << 28]*C.char)(olds)[:count:count]
-	nhdrs := (*[1 << 28]*C.char)(news)[:count:count]
-	olhdrs := (*[1 << 28]C.size_t)(olens)[:count:count]
-	nlhdrs := (*[1 << 28]C.size_t)(nlens)[:count:count]
-	i := 0
+	froms := make([]string, 0, count)
+	tos := make([]string, 0, count)
 	for from, to := range renames {
-		fp, fn := cStr(from)
-		tp, tn := cStr(to)
-		ohdrs[i] = fp
-		olhdrs[i] = fn
-		nhdrs[i] = tp
-		nlhdrs[i] = tn
-		i++
+		froms = append(froms, from)
+		tos = append(tos, to)
 	}
+	fblob, fptrs, flens := cStrTable(froms)
+	defer C.free(fblob)
+	defer C.free(fptrs)
+	defer C.free(flens)
+	nblob, nptrs, nlens := cStrTable(tos)
+	defer C.free(nblob)
+	defer C.free(nptrs)
+	defer C.free(nlens)
 	return cStatusErr(C.corvid_load_from_path_with_renames(db.h, p, pn,
-		(**C.char)(olds), (**C.char)(news), (*C.size_t)(olens), (*C.size_t)(nlens), C.size_t(count)))
+		(**C.char)(fptrs), (**C.char)(nptrs), (*C.size_t)(flens), (*C.size_t)(nlens), C.size_t(count)))
 }
 
 func cBackup(db *cDB, path string) error {
@@ -1417,15 +1428,17 @@ func cGroupIterNilNextOK() bool {
 // ---------------------------------------------------------------------------
 
 type scanJob struct {
-	fn  func(key []byte, doc any) bool
-	ks  *keySet
-	err error // a decode failure stops the scan; surfaced by cScan
+	fn       func(key []byte, doc any) bool
+	ks       *keySet
+	err      error // a decode failure stops the scan; surfaced by cScan
+	panicVal any   // a panic in fn; recovered in the trampoline, re-panicked by cScan
 }
 
 type updateJob struct {
-	fn  func(current any) (any, error)
-	ks  *keySet
-	err error // the user callback's failure; surfaced by cUpdate
+	fn       func(current any) (any, error)
+	ks       *keySet
+	err      error // the user callback's failure; surfaced by cUpdate
+	panicVal any   // a panic in fn; recovered in the trampoline, re-panicked by cUpdate
 }
 
 var (
@@ -1463,8 +1476,17 @@ func cbDel(id uintptr) {
 // sanctioned corvid_value_clone escape).
 
 //export corvidgoScanCB
-func corvidgoScanCB(id C.uintptr_t, key *C.uint8_t, keyLen C.size_t, doc *C.corvid_value) C.int {
+func corvidgoScanCB(id C.uintptr_t, key *C.uint8_t, keyLen C.size_t, doc *C.corvid_value) (ret C.int) {
 	job := cbGet(uintptr(id)).(*scanJob)
+	// A panic in the user closure must never unwind through the C
+	// frames (the Go runtime cannot): recover it here, stash the value,
+	// stop the scan — cScan re-panics once the engine call has returned.
+	defer func() {
+		if p := recover(); p != nil {
+			job.panicVal = p
+			ret = 0
+		}
+	}()
 	k := copyBytes(key, keyLen)
 	d, err := decodeValue(doc, job.ks)
 	if err != nil {
@@ -1478,8 +1500,17 @@ func corvidgoScanCB(id C.uintptr_t, key *C.uint8_t, keyLen C.size_t, doc *C.corv
 }
 
 //export corvidgoUpdateCB
-func corvidgoUpdateCB(id C.uintptr_t, current *C.corvid_value, out **C.corvid_value) C.corvid_status {
+func corvidgoUpdateCB(id C.uintptr_t, current *C.corvid_value, out **C.corvid_value) (ret C.corvid_status) {
 	job := cbGet(uintptr(id)).(*updateJob)
+	// Same recover discipline as corvidgoScanCB: a panic in the user
+	// closure aborts the update at the ABI level (CORVID_ERR) and is
+	// re-panicked by cUpdate once the engine call has returned.
+	defer func() {
+		if p := recover(); p != nil {
+			job.panicVal = p
+			ret = C.CORVID_ERR
+		}
+	}()
 	var cur any
 	if current != nil {
 		d, err := decodeValue(current, job.ks)
@@ -1519,6 +1550,9 @@ func cUpdate(c *cColl, ks *keySet, key []byte, fn func(current any) (any, error)
 	k, n := cBytes(key)
 	st := C.corvidgo_update_call(c.h, k, n, cell)
 	cbDel(id)
+	if job.panicVal != nil {
+		panic(job.panicVal) // the closure panicked: surface it here, not through C frames
+	}
 	if st == C.CORVID_OK {
 		return nil
 	}

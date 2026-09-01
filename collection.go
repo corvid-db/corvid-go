@@ -13,7 +13,11 @@ import (
 	"sync"
 )
 
-// Collection is a handle to one collection of a Db.
+// Collection is a handle to one collection of a Db. It is safe for
+// concurrent use, under the same §6 close caveat as Db: Close only
+// after every concurrent operation on it has completed — freeing the
+// engine handle while another thread is inside a call on it is
+// undefined behavior, and the Db's checkOpen gate is TOCTOU by design.
 type Collection struct {
 	mu   sync.Mutex
 	c    *cColl

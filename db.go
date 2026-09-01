@@ -22,6 +22,13 @@ var errClosedDb = newErr(ErrDatabase, "database is closed")
 // Db is an open corvid database (file-backed via Open, in-memory via
 // OpenMemory). It is safe for concurrent use. Call Close when done;
 // the finalizer is only a backstop.
+//
+// Close caveat (FFI.md §6): close only after every concurrent
+// operation on this Db has completed — freeing the engine handle while
+// another thread is inside a call on it is undefined behavior. The
+// checkOpen gate that rejects calls on a closed Db is TOCTOU by
+// design (a loud use-after-close rejection, not a lock); sequencing
+// Close against in-flight calls is the caller's contract.
 type Db struct {
 	mu     sync.Mutex
 	c      *cDB

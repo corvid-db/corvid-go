@@ -19,7 +19,7 @@
 // everything borrowed back is copied into Go-owned memory before the
 // borrow ends. No C pointer escapes this package.
 //
-// The map-key boundary (v1): the v0.2.1 ABI has no map-key iterator —
+// The map-key boundary (v1): the v0.2.2 ABI has no map-key iterator —
 // a Map is readable only by known key. Decoding therefore probes the
 // Db's candidate key set (fed by every document that passed through
 // this binding's write paths and by declared schemas) and verifies the
@@ -44,7 +44,7 @@ import (
 // the file comment). On a database opened over pre-existing data, read
 // documents with GetFields or Query.Select, or write/declare the keys
 // first.
-var ErrMapKeyEnumeration = errors.New("corvid: map decode could not enumerate all keys (the v0.2.1 ABI has no map-key iterator; see docs/PLAN.md)")
+var ErrMapKeyEnumeration = errors.New("corvid: map decode could not enumerate all keys (the v0.2.2 ABI has no map-key iterator; see docs/PLAN.md)")
 
 // keySet is the Db-wide candidate key-name oracle for map decoding.
 // It is safe for concurrent use.

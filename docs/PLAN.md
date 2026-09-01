@@ -141,9 +141,15 @@ The engine contract, restated as Go:
   chainable, consumed by the terminal call).
 - Errors are per-thread in C and per-goroutine in effect: every wrapper
   reads `corvid_last_error_code/message` **immediately** after the failing
-  call, on the same OS thread (cgo calls run on the calling goroutine's
-  thread), so the thread-local slot can never be clobbered by another
-  goroutine's failure between the call and the read.
+  call, on the thread the failing call ran on (cgo calls run on the
+  calling goroutine's thread). That shrinks the exposure to the
+  theoretical minimum, but it is not an absolute guarantee: the runtime
+  may migrate the goroutine between the failing call and the read, and
+  the read then lands on another thread's slot and **misses** the
+  message. A miss is loud, never silent — a failure whose slot reads
+  empty surfaces as a zero-code `CorvidError` ("failure with no
+  recorded error", cgo.go), never as another call's error silently
+  misattributed.
 - v1 is **context-free and synchronous**, per the master plan (the engine
   is sync; `context.Context` would be a lie over a synchronous ABI).
 
