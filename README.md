@@ -122,7 +122,7 @@ loud rejection of use-after-close, not a lock.
 
 ## Documents and maps
 
-Engine v0.3.1 added the map-key iterator (`corvid_value_map_keys`, the
+Engine v0.3.0 added the map-key iterator (`corvid_value_map_keys`, the
 §4.4 erratum): every decode in this binding enumerates map keys
 through it — `Get`/`Scan`/`Page`/query rows decode documents
 COMPLETE on any database, whatever wrote the data, unknown and UTF-8

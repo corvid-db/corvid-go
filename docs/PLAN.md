@@ -153,7 +153,7 @@ The engine contract, restated as Go:
 - v1 is **context-free and synchronous**, per the master plan (the engine
   is sync; `context.Context` would be a lie over a synchronous ABI).
 
-## Map-key enumeration: the v0.2.2 oracle and its v0.3.1 collapse
+## Map-key enumeration: the v0.2.2 oracle and its v0.3.0 collapse
 
 **History (v0.2.2 bootstrap).** The C ABI had **no map-key iterator** —
 `Value::Map` was readable only by known key (`corvid_value_map_get`; the
@@ -169,7 +169,7 @@ silently-truncated map. `GetFields` and `Query.Select` never needed the
 oracle (their field list is the key source). The gap was logged as
 docs/FFI.md §4.4 errata.
 
-**The v0.3.1 collapse.** Engine v0.3.1 shipped the anticipated
+**The v0.3.0 collapse.** Engine v0.3.0 shipped the anticipated
 `corvid_value_map_keys` (§4.4's additive erratum: an OWNED strs cursor
 in ascending key-BYTE order; non-maps an EMPTY cursor, inert). The
 candidate machinery — the key set, `ErrMapKeyEnumeration`, the write
@@ -181,7 +181,7 @@ wrote the data (`mapkeys_test.go` pins the across-a-reopen shape the
 oracle existed for; the VMAP_KEYS/GET_KEYS golden lines pin the
 iterator's order and inert shapes op by op). Retrieval queries keep
 `Row.Doc == nil` without `Select` — a projection decision that stands
-on its own now, no longer ABI-forced; `PhraseSearch` rows (v0.3.1's
+on its own now, no longer ABI-forced; `PhraseSearch` rows (v0.3.0's
 other addition) always carry documents.
 
 ## Phase GO1 (this bootstrap) — scope
