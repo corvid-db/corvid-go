@@ -145,18 +145,6 @@ export CGO_LDFLAGS="-L/usr/local/lib -lcorvid"
 go build ./...
 ```
 
-## What's inside
-
-| Path | What it is |
-| --- | --- |
-| `fetch.sh` / `fetch.ps1` | Download the pinned release archive, verify (sha256) against `checksums.txt`, byte-check the golden fixtures, normalize into `deps/current/` |
-| `cgo.go` | The cgo layer — every line of C interop: the corvid.h include, the scan/update callback bridges, Go-safe wrappers over the ABI |
-| `errors.go` / `values.go` / `db.go` / `collection.go` / `query.go` | The idiomatic Go API (Db/Collection/Query/Predicate, the value mapping, the error type) |
-| `golden_test.go` | The golden-suite port — 267 fixture lines through the binding, no softened asserts |
-| `golden/` | The engine's golden fixtures, vendored byte-identical (verified against each release) |
-| `examples/{quickstart,hybrid,vector-index,text-search,graph,geo}/` | The examples tour — one runnable `main.go` per concept, `go run` on every CI leg: the README quickstart, hybrid RRF+MMR, the three vector-index families vs exact, BM25 incl. CJK, graph + delete cascade, geo radius/bbox/nearest |
-| `docs/PLAN.md` | The binding's plan: architecture ruling, lifetime mapping, pointer discipline, phase scope |
-
 ## CI
 
 A linux/macos/windows × Go {1.27.x, 1.26.x} matrix
