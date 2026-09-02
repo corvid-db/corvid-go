@@ -52,7 +52,6 @@ func (coll *Collection) Insert(key []byte, doc any) error {
 		return err
 	}
 	defer cValueFree(v)
-	coll.db.ks.remember(doc)
 	return cInsert(coll.c, key, v)
 }
 
@@ -79,9 +78,6 @@ func (coll *Collection) PutMany(keys [][]byte, docs []any) error {
 			cValueFree(v)
 		}
 	}()
-	for _, d := range docs {
-		coll.db.ks.remember(d)
-	}
 	return cPutMany(coll.c, keys, vals)
 }
 
@@ -93,7 +89,6 @@ func (coll *Collection) InsertAuto(doc any) ([]byte, error) {
 		return nil, err
 	}
 	defer cValueFree(v)
-	coll.db.ks.remember(doc)
 	return cInsertAuto(coll.c, v)
 }
 
@@ -105,7 +100,6 @@ func (coll *Collection) InsertTTL(key []byte, doc any, expiresAt int64) error {
 		return err
 	}
 	defer cValueFree(v)
-	coll.db.ks.remember(doc)
 	return cInsertTTL(coll.c, key, v, expiresAt)
 }
 
@@ -133,7 +127,6 @@ func (coll *Collection) Patch(key []byte, patch any) error {
 		return err
 	}
 	defer cValueFree(v)
-	coll.db.ks.remember(patch)
 	return cPatch(coll.c, key, v)
 }
 
@@ -144,7 +137,7 @@ func (coll *Collection) Patch(key []byte, patch any) error {
 // ErrArgument and writes nothing. The callback must not call back
 // into the engine (FFI.md §1.6).
 func (coll *Collection) Update(key []byte, fn func(current any) (any, error)) error {
-	return cUpdate(coll.c, coll.db.ks, key, fn)
+	return cUpdate(coll.c, key, fn)
 }
 
 // CompareAndSet atomically tests-and-sets key: applied reports whether
@@ -197,11 +190,9 @@ func (coll *Collection) DeleteBatch(keys ...[]byte) (removed int, err error) {
 }
 
 // Get returns the document at key (nil, nil when absent), decoded per
-// the values.go mapping. Map documents decode through the candidate-
-// key oracle: on a database with data not written through this
-// binding, a map whose keys are not all known fails with an error
-// wrapping ErrMapKeyEnumeration — use GetFields for explicit-field
-// reads there (see values.go).
+// the values.go mapping. Map keys enumerate through the engine's
+// corvid_value_map_keys (v0.3.0): every document this engine can read
+// decodes COMPLETE — on any database, whatever wrote it.
 func (coll *Collection) Get(key []byte) (doc any, err error) {
 	v, err := cGet(coll.c, key)
 	if err != nil {
@@ -211,13 +202,12 @@ func (coll *Collection) Get(key []byte) (doc any, err error) {
 		return nil, nil
 	}
 	defer cValueFree(v)
-	return decodeValue(v.h, coll.db.ks)
+	return decodeValue(v.h)
 }
 
 // GetFields returns the named fields (dot paths; all-digit segments
 // index arrays) of the document at key, as a map holding exactly the
-// fields that are present. Field paths are the key source, so this
-// never needs the map-key oracle and works on any database.
+// fields that are present.
 func (coll *Collection) GetFields(key []byte, fields ...string) (map[string]any, error) {
 	v, err := cGet(coll.c, key)
 	if err != nil {
@@ -233,7 +223,7 @@ func (coll *Collection) GetFields(key []byte, fields ...string) (map[string]any,
 		if child == nil {
 			continue
 		}
-		d, err := decodeValue(child, coll.db.ks)
+		d, err := decodeValue(child)
 		if err != nil {
 			return nil, err
 		}
@@ -248,10 +238,9 @@ func (coll *Collection) Len() (int, error) {
 }
 
 // Scan streams every key/document pair in key order. fn returning
-// false stops the scan early (not an error). Documents decode through
-// the candidate-key oracle (see Get).
+// false stops the scan early (not an error).
 func (coll *Collection) Scan(fn func(key []byte, doc any) bool) error {
-	return cScan(coll.c, coll.db.ks, fn)
+	return cScan(coll.c, fn)
 }
 
 // Page returns up to limit rows ordered by key, starting after the
@@ -269,13 +258,44 @@ func (coll *Collection) Page(after []byte, limit int) (rows []Row, next []byte, 
 		if !ok {
 			break
 		}
-		doc, err := decodeValue(docH, coll.db.ks)
+		doc, err := decodeValue(docH)
 		if err != nil {
 			return nil, nil, err
 		}
 		rows = append(rows, Row{Key: key, Doc: doc, Score: score})
 	}
 	return rows, next, nil
+}
+
+// PhraseSearch is the DIRECT positional text search (engine v0.3.0's
+// §4.6 addition; no query handle): documents whose field TEXT contains
+// phrase as a consecutive, IN-ORDER run of analyzed tokens, most
+// relevant first, ties by key, up to k rows. The engine's analysis
+// applies to the phrase too, and stop words collapse out of adjacency
+// ("embedded the database" matches "embedded database"). k == 0
+// answers an empty slice — inert, never an error. Each Row carries
+// the hit's document and its BM25 phrase score (Row.Score — the
+// phrase scale, NOT the builder's fused RRF scale; the two rows
+// producers keep their own scales).
+func (coll *Collection) PhraseSearch(field, phrase string, k int) ([]Row, error) {
+	rowsH, err := cPhraseSearch(coll.c, field, phrase, k)
+	if err != nil {
+		return nil, err
+	}
+	defer cRowsFree(rowsH)
+	var rows []Row
+	for {
+		key, docH, score, ok := cRowsNext(rowsH)
+		if !ok {
+			break
+		}
+		doc, err := decodeValue(docH) // borrowed: decode before the next step
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, Row{Key: key, Doc: doc, Score: score})
+	}
+	return rows, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -347,10 +367,8 @@ func (coll *Collection) CreateVectorIndexOnDiskPQ(field string, metric Metric, s
 // Schema (FFI.md §4.10)
 // ---------------------------------------------------------------------------
 
-// SetSchema declares (or replaces) the collection's schema. Its field
-// names also join the Db's candidate key set for map decoding.
+// SetSchema declares (or replaces) the collection's schema.
 func (coll *Collection) SetSchema(defs ...FieldDef) error {
-	coll.db.ks.addAll(fieldDefNames(defs))
 	return cSetSchema(coll.c, defs)
 }
 
@@ -373,17 +391,6 @@ func (coll *Collection) Schema() ([]FieldDef, error) {
 		defs = append(defs, fd)
 	}
 	return defs, nil
-}
-
-func fieldDefNames(defs []FieldDef) []string {
-	if len(defs) == 0 {
-		return nil
-	}
-	names := make([]string, len(defs))
-	for i, d := range defs {
-		names[i] = d.Name
-	}
-	return names
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +489,7 @@ func (coll *Collection) walkGeoHits(h *cGeoHits) ([]GeoHit, error) {
 		}
 		g := GeoHit{Key: hit.Key, DistanceKm: hit.Dist}
 		if hit.HasDoc {
-			doc, err := decodeValue(hit.Doc, coll.db.ks) // borrowed: decode before the next step
+			doc, err := decodeValue(hit.Doc) // borrowed: decode before the next step
 			if err != nil {
 				return nil, err
 			}

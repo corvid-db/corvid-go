@@ -848,7 +848,7 @@ func (S *scenario) runLine(op, args, expected string) {
 			S.check(child == nil, "path unexpectedly present")
 		} else {
 			S.check(child != nil, "path unexpectedly absent, want %q", expected)
-			got, err := decodeValue(child, nil)
+			got, err := decodeValue(child)
 			S.expectOK(err)
 			S.checkValue(got, expected)
 		}
@@ -868,6 +868,17 @@ func (S *scenario) runLine(op, args, expected string) {
 		val := S.encode(a[2])
 		S.expectOK(cMapPut(m, a[1], val)) // consumes val
 		S.expectNum(expected, int64(cVLen(m.h)))
+		return
+
+	case "VMAP_KEYS":
+		// The v0.3.0 key iterator over a LITERAL: ascending key-BYTE
+		// order whatever the construction order; empty map, non-maps,
+		// and scalars answer an EMPTY cursor — inert.
+		v := S.encode(a[0])
+		defer cValueFree(v)
+		keys, err := cVMapKeys(v.h)
+		S.expectOK(err)
+		S.checkKeys(keys, expected)
 		return
 
 	case "NULLFREES":
@@ -915,12 +926,23 @@ func (S *scenario) runLine(op, args, expected string) {
 			S.check(doc == nil, "expected absence, got a document: %#v", doc)
 			return
 		}
-		want := S.lit(expected)
-		S.db.ks.remember(want) // the expectation is the key source, same as the C harness's maps_equal
 		doc, err := S.docs().Get([]byte(a[0]))
 		S.expectOK(err)
 		S.check(doc != nil, "expected a document, got absence")
 		S.checkValue(doc, expected)
+		return
+
+	case "GET_KEYS":
+		// Key enumeration over a DECODED document (fetch by key first,
+		// the decode-from-storage half bindings need): the storage
+		// round-trip keeps every key; ascending byte order.
+		v, err := cGet(S.docs().c, []byte(a[0]))
+		S.expectOK(err)
+		S.check(v != nil, "GET_KEYS on an absent document")
+		defer cValueFree(v)
+		keys, err := cVMapKeys(v.h)
+		S.expectOK(err)
+		S.checkKeys(keys, expected)
 		return
 
 	case "PUTMANY", "PUTMANY_ROLLBACK":
@@ -1165,6 +1187,20 @@ func (S *scenario) runLine(op, args, expected string) {
 		rows, err := S.docs().Query().Text(a[0], S.textBody(a[1]), S.parseInt(a[2])).Run()
 		S.expectOK(err)
 		S.checkKeys(rowKeys(rows), expected)
+		return
+
+	case "PHRASE", "PHRASE_K0":
+		// The v0.3.0 direct positional search through the binding's
+		// PhraseSearch: order-sensitive adjacency, BM25 phrase scores
+		// in the score suffix; PHRASE_K0 is the inert k==0 shape — an
+		// EMPTY result, never an error.
+		rows, err := S.docs().PhraseSearch(a[0], S.textBody(a[1]), S.parseInt(a[2]))
+		S.expectOK(err)
+		S.checkKeys(rowKeys(rows), keyPart(expected))
+		S.checkScores(rowScores(rows), suffixPart(expected))
+		if op == "PHRASE_K0" {
+			S.check(len(rows) == 0, "k == 0 must answer an empty cursor")
+		}
 		return
 
 	case "HYBRID", "HYBRID_F":

@@ -32,7 +32,6 @@ var errClosedDb = newErr(ErrDatabase, "database is closed")
 type Db struct {
 	mu     sync.Mutex
 	c      *cDB
-	ks     *keySet
 	closed bool
 }
 
@@ -59,7 +58,7 @@ func openDB(open func() (*cDB, error)) (*Db, error) {
 	if err != nil {
 		return nil, err
 	}
-	db := &Db{c: c, ks: newKeySet()}
+	db := &Db{c: c}
 	runtime.SetFinalizer(db, (*Db).Close)
 	return db, nil
 }

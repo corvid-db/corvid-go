@@ -9,7 +9,7 @@ of that proof it carries the idiomatic Go API.
 
 Engine repo: `corvid-db/corvid` (read-only upstream; never a submodule, never
 vendored). Canonical docs: the corvid docs site's FFI section (the
-`docs/FFI.md` contract — 122 symbols, frozen enums, §8 idiom gate).
+`docs/FFI.md` contract — 124 symbols, frozen enums, §8 idiom gate).
 
 ## The architecture ruling: cgo over the typed C ABI, release artifacts only
 
@@ -56,7 +56,7 @@ Consequences, all locked:
 Inherited from the bindings program's master plan and non-negotiable:
 
 > **A binding opens with the golden-suite port.** The engine's golden
-> fixtures (256 executable lines across 8 files) are the contract; a
+> fixtures (267 executable lines across 8 files) are the contract; a
 > binding that wraps the ABI before it can replay the contract is building
 > on unverified ground.
 
@@ -153,32 +153,36 @@ The engine contract, restated as Go:
 - v1 is **context-free and synchronous**, per the master plan (the engine
   is sync; `context.Context` would be a lie over a synchronous ABI).
 
-## The v1 boundary: map-key enumeration
+## Map-key enumeration: the v0.2.2 oracle and its v0.3.0 collapse
 
-The C ABI (v0.3.0, 122 symbols) has **no map-key iterator** — `Value::Map`
-is readable only by known key (`corvid_value_map_get`; the engine's own FFI
-suite walks maps by expected keys with the length pinned — task-3 report,
-note 2). A Go API that returns `map[string]any` from `Get` therefore needs
-a key source. The binding's design is **either-correct-or-loud**:
+**History (v0.2.2 bootstrap).** The C ABI had **no map-key iterator** —
+`Value::Map` was readable only by known key (`corvid_value_map_get`; the
+engine's own FFI suite walked maps by expected keys with the length
+pinned — task-3 report, note 2). A Go API that returns `map[string]any`
+from `Get` needs a key source, so each `Db` kept a candidate key-name
+set, populated by every document passing through the binding's write
+paths and by declared schemas; decoding probed the candidates and
+**verified the probed count against the map's true entry count**
+(`corvid_value_len`) — a full match decoded, any unknown key failed
+loudly (`ErrMapKeyEnumeration`) instead of returning a
+silently-truncated map. `GetFields` and `Query.Select` never needed the
+oracle (their field list is the key source). The gap was logged as
+docs/FFI.md §4.4 errata.
 
-- Each `Db` keeps a candidate key-name set, populated by every document
-  that passes through this binding's write paths and by declared schemas
-  (`SetSchema` notes its field names).
-- Decoding a map probes the candidates and **verifies the probed count
-  against the map's true entry count** (`corvid_value_len`). A full match
-  decodes; any unknown key makes the decode **fail loudly**
-  (`ErrMapKeyEnumeration`) instead of returning a silently-truncated map.
-- Escapes that never need the oracle: `(*Collection).GetFields(key,
-  fields...)` (explicit-field read, extras allowed) and
-  `Query.Select(fields...)` (projected rows decode from exactly the
-  selected fields). Non-map values (arrays, vectors, bytes, scalars)
-  decode fully always.
-
-The proper fix is the upstream ABI addition `corvid_value_map_keys`
-(anticipated by the engine's own task-3 notes; a loud §8 append). When it
-ships, this binding re-pins and the candidate machinery collapses into a
-plain decode. Until then the limitation is documented in the README and
-here — never papered over.
+**The v0.3.0 collapse.** Engine v0.3.0 shipped the anticipated
+`corvid_value_map_keys` (§4.4's additive erratum: an OWNED strs cursor
+in ascending key-BYTE order; non-maps an EMPTY cursor, inert). The
+candidate machinery — the key set, `ErrMapKeyEnumeration`, the write
+path `remember` hooks, the schema `addAll` — is DELETED, not
+maintained alongside: `decodeValue` enumerates keys through the real
+iterator and every read path (`Get`/`Scan`/`Page`/query rows/geo
+docs/`Update` callbacks) decodes COMPLETE on any database, whatever
+wrote the data (`mapkeys_test.go` pins the across-a-reopen shape the
+oracle existed for; the VMAP_KEYS/GET_KEYS golden lines pin the
+iterator's order and inert shapes op by op). Retrieval queries keep
+`Row.Doc == nil` without `Select` — a projection decision that stands
+on its own now, no longer ABI-forced; `PhraseSearch` rows (v0.3.0's
+other addition) always carry documents.
 
 ## Phase GO1 (this bootstrap) — scope
 
@@ -208,7 +212,7 @@ here — never papered over.
    Value mapping: `map[string]any`, `[]byte` (Bytes), `[]float32` (Vector),
    `int64`/`float64`/`string`/`bool`/`nil`; NaN/±inf/-0.0 cross bit-exact
    (documented).
-6. **The golden port** — `golden_test.go`: 256 executable fixture lines
+6. **The golden port** — `golden_test.go`: 267 executable fixture lines
    through the binding, first failure named per file:line, dispatch count
    enforced.
 7. **CI** — a linux/macos/windows matrix: fetch+verify, `go vet`,

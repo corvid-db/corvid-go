@@ -489,6 +489,28 @@ func cVMapGet(h *C.corvid_value, key string) *C.corvid_value {
 	return C.corvid_value_map_get(h, k, kl)
 }
 
+// cVMapKeys enumerates a map value's keys via corvid_value_map_keys
+// (the v0.3.0 §4.4 addition): an OWNED strs cursor walked to
+// completion, ascending key-BYTE order (the engine BTreeMap order).
+// Non-maps answer an empty slice — inert; NULL v is the only failure.
+func cVMapKeys(h *C.corvid_value) ([]string, error) {
+	s := C.corvid_value_map_keys(h)
+	if s == nil {
+		return nil, cLastError()
+	}
+	defer C.corvid_strs_free(s)
+	var out []string
+	for {
+		var str *C.char
+		var n C.size_t
+		if C.corvid_strs_next(s, &str, &n) != 1 {
+			break
+		}
+		out = append(out, string(copyBytes((*C.uint8_t)(unsafe.Pointer(str)), n))) // borrowed → copy now
+	}
+	return out, nil
+}
+
 func cVClone(h *C.corvid_value) (*cVal, error) {
 	c := C.corvid_value_clone(h)
 	if c == nil {
@@ -690,6 +712,20 @@ func cQuerySelect(q *cQuery, fields []string) error {
 // cQueryRun consumes q (even on failure).
 func cQueryRun(q *cQuery) (*C.corvid_rows, error) {
 	h := C.corvid_query_run(q.h)
+	if h == nil {
+		return nil, cLastError()
+	}
+	return h, nil
+}
+
+// cPhraseSearch is the DIRECT positional text search (the v0.3.0 §4.6
+// addition): one call over the coll, no query handle. The returned
+// rows cursor is OWNED and materialized — its score field carries the
+// hit's BM25 phrase sum (not the builder's fused RRF scale).
+func cPhraseSearch(c *cColl, field, phrase string, k int) (*C.corvid_rows, error) {
+	f, fn := cStr(field)
+	p, pn := cStr(phrase)
+	h := C.corvid_phrase_search(c.h, f, fn, p, pn, C.size_t(k))
 	if h == nil {
 		return nil, cLastError()
 	}
@@ -1006,8 +1042,8 @@ func cGet(c *cColl, key []byte) (*cVal, error) {
 	return &cVal{h: out}, nil
 }
 
-func cScan(c *cColl, ks *keySet, fn func(key []byte, doc any) bool) error {
-	job := &scanJob{fn: fn, ks: ks}
+func cScan(c *cColl, fn func(key []byte, doc any) bool) error {
+	job := &scanJob{fn: fn}
 	id := cbPut(job)
 	cell := C.malloc(C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(cell)
@@ -1429,14 +1465,12 @@ func cGroupIterNilNextOK() bool {
 
 type scanJob struct {
 	fn       func(key []byte, doc any) bool
-	ks       *keySet
 	err      error // a decode failure stops the scan; surfaced by cScan
 	panicVal any   // a panic in fn; recovered in the trampoline, re-panicked by cScan
 }
 
 type updateJob struct {
 	fn       func(current any) (any, error)
-	ks       *keySet
 	err      error // the user callback's failure; surfaced by cUpdate
 	panicVal any   // a panic in fn; recovered in the trampoline, re-panicked by cUpdate
 }
@@ -1488,7 +1522,7 @@ func corvidgoScanCB(id C.uintptr_t, key *C.uint8_t, keyLen C.size_t, doc *C.corv
 		}
 	}()
 	k := copyBytes(key, keyLen)
-	d, err := decodeValue(doc, job.ks)
+	d, err := decodeValue(doc)
 	if err != nil {
 		job.err = err
 		return 0 // stop the scan; not an error at the C level
@@ -1513,7 +1547,7 @@ func corvidgoUpdateCB(id C.uintptr_t, current *C.corvid_value, out **C.corvid_va
 	}()
 	var cur any
 	if current != nil {
-		d, err := decodeValue(current, job.ks)
+		d, err := decodeValue(current)
 		if err != nil {
 			job.err = err
 			return C.CORVID_ERR
@@ -1541,8 +1575,8 @@ func corvidgoUpdateCB(id C.uintptr_t, current *C.corvid_value, out **C.corvid_va
 // cUpdate drives the read-modify-write callback. An aborting callback
 // fails with CORVID_E_ARGUMENT at the ABI level; this wrapper prefers the
 // Go callback's own error, wrapped in a CorvidError with that code.
-func cUpdate(c *cColl, ks *keySet, key []byte, fn func(current any) (any, error)) error {
-	job := &updateJob{fn: fn, ks: ks}
+func cUpdate(c *cColl, key []byte, fn func(current any) (any, error)) error {
+	job := &updateJob{fn: fn}
 	id := cbPut(job)
 	cell := C.malloc(C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(cell)
