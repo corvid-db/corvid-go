@@ -10,10 +10,10 @@
 // predicate, with finalizers as backstops.
 //
 // Documents in Run rows materialize through Select: a projected row
-// decodes from exactly the selected fields (which never needs the
-// map-key oracle of values.go). Without Select, Row.Doc is nil — the
-// v0.2.2 ABI has no map-key iterator, so this binding refuses to
-// guess; pair with Get/GetFields for point reads (docs/PLAN.md).
+// decodes from exactly the selected fields. Without Select, Row.Doc is
+// nil — retrieval queries return keys and scores; pair with Get (or
+// Collection.PhraseSearch, whose rows always carry documents) for
+// documents (docs/PLAN.md).
 
 package corvid
 
@@ -40,8 +40,8 @@ type Weighted struct {
 	Weight float64
 }
 
-// GeoHit is one geo query hit; Doc decodes through the candidate-key
-// oracle (nil for weighted-neighbor cursors, which carry no document).
+// GeoHit is one geo query hit (nil Doc for weighted-neighbor cursors,
+// which carry no document).
 type GeoHit struct {
 	Key        []byte
 	DistanceKm float64
@@ -331,7 +331,6 @@ func (q *Query) OrderBy(field string, descending bool) *Query {
 func (q *Query) Select(fields ...string) *Query {
 	if len(fields) > 0 {
 		q.selected = true
-		q.db.ks.addAll(fields)
 	}
 	q.step(cQuerySelect(q.c, fields))
 	return q
@@ -373,7 +372,7 @@ func (q *Query) Run() ([]Row, error) {
 		}
 		var doc any
 		if q.selected {
-			doc, err = decodeValue(docH, q.db.ks) // borrowed: decode before the next step
+			doc, err = decodeValue(docH) // borrowed: decode before the next step
 			if err != nil {
 				return nil, err
 			}
@@ -444,7 +443,7 @@ func (q *Query) Min(field string) (any, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return decodeValue(v.h, q.db.ks)
+	return decodeValue(v.h)
 }
 
 // Max returns field's maximum value (nil, nil when absent) (terminal).
@@ -462,7 +461,7 @@ func (q *Query) Max(field string) (any, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return decodeValue(v.h, q.db.ks)
+	return decodeValue(v.h)
 }
 
 // GroupCount counts per distinct value of field (terminal).

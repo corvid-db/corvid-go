@@ -6,7 +6,7 @@ FFI artifacts** (the platform cdylib and `corvid.h`) over **cgo** and
 carries an idiomatic Go API on top — and it proves, continuously and
 outside the engine repo, that the published artifacts drive a real Go
 consumer to the same verdicts the engine's own suite produces: the
-golden-suite port in `golden_test.go` replays the engine's 256-line
+golden-suite port in `golden_test.go` replays the engine's 267-line
 fixture suite through this binding.
 
 **Documentation:** the [corvid docs site](https://corvid-db.github.io/docs/)
@@ -28,7 +28,7 @@ copied under the `libcorvid.dll.a` name so mingw-w64's `ld` finds it).
 Requirements stop at "a C compiler" — which cgo already needs.
 
 - **No Rust toolchain, ever.**
-- **One exact engine pin** — `v0.2.2`, living in one variable per fetch
+- **One exact engine pin** — `v0.3.0`, living in one variable per fetch
   script (`CORVID_VERSION` in `fetch.sh`, `$CorvidVersion` in
   `fetch.ps1`), stamped into `deps/version.txt`.
 - **No vendored binaries in git** (`deps/` is gitignored) and **no
@@ -42,8 +42,8 @@ Requirements: Go ≥ 1.26 (CI exercises 1.27.x and 1.26.x), a C compiler
 `shasum`/`sha256sum` (macOS/Linux) or PowerShell 5+ (Windows).
 
 ```sh
-make deps          # fetch + verify corvid v0.2.2 into deps/current
-go test ./...      # the golden suite (256 executable lines, 8 fixtures)
+make deps          # fetch + verify corvid v0.3.0 into deps/current
+go test ./...      # the golden suite (267 executable lines, 8 fixtures)
 ```
 
 On Windows (PowerShell), `make deps` is `./fetch.ps1`; there is no
@@ -120,27 +120,18 @@ while another thread is inside a call on it is undefined behavior, and
 the binding's closed-handle gate (`checkOpen`) is TOCTOU by design, a
 loud rejection of use-after-close, not a lock.
 
-## Documents, maps, and the v0.2.2 ABI boundary
+## Documents and maps
 
-The v0.2.2 C ABI has **no map-key iterator** — a stored map is readable
-only by known key. Consequences in this binding (either-correct-or-
-loud, never silently truncated — details in
-[docs/PLAN.md](docs/PLAN.md#the-v1-boundary-map-key-enumeration)):
-
-- `Get`/`Scan`/`Page` decode map documents through a candidate-key set
-  fed by everything written through this binding (plus declared
-  schemas). On a database with pre-existing data, a map with unknown
-  keys fails with an error wrapping `corvid.ErrMapKeyEnumeration`.
-- `GetFields(key, fields...)` (explicit-field read) and
-  `Query.Select(fields...)` (projection — the only shape in which
-  `Run` materializes `Row.Doc`) never need the oracle and work on any
-  database. Without `Select`, `Row.Doc` is nil: carry the key, read
-  the document explicitly.
-- Non-map values (arrays, vectors, bytes, scalars) always decode
-  completely.
-
-The upstream `corvid_value_map_keys` ABI append will collapse this
-machinery into a plain decode.
+Engine v0.3.0 added the map-key iterator (`corvid_value_map_keys`, the
+§4.4 erratum): every decode in this binding enumerates map keys
+through it — `Get`/`Scan`/`Page`/query rows decode documents
+COMPLETE on any database, whatever wrote the data, unknown and UTF-8
+keys included (`mapkeys_test.go` pins the across-a-reopen shape that
+the v0.2.2-era candidate-key oracle could not do; the decision-log row
+in [docs/PLAN.md](docs/PLAN.md) records the collapse). Retrieval
+queries still return `Row.Doc == nil` without `Query.Select(...)`
+(retrieval carries keys and scores; read the document explicitly), and
+`(*Collection).PhraseSearch` rows always carry documents.
 
 ## Installing the engine system-wide (alternative to deps/)
 
@@ -161,7 +152,7 @@ go build ./...
 | `fetch.sh` / `fetch.ps1` | Download the pinned release archive, verify (sha256) against `checksums.txt`, byte-check the golden fixtures, normalize into `deps/current/` |
 | `cgo.go` | The cgo layer — every line of C interop: the corvid.h include, the scan/update callback bridges, Go-safe wrappers over the ABI |
 | `errors.go` / `values.go` / `db.go` / `collection.go` / `query.go` | The idiomatic Go API (Db/Collection/Query/Predicate, the value mapping, the error type) |
-| `golden_test.go` | The golden-suite port — 256 fixture lines through the binding, no softened asserts |
+| `golden_test.go` | The golden-suite port — 267 fixture lines through the binding, no softened asserts |
 | `golden/` | The engine's golden fixtures, vendored byte-identical (verified against each release) |
 | `examples/{quickstart,hybrid,vector-index,text-search,graph,geo}/` | The examples tour — one runnable `main.go` per concept, `go run` on every CI leg: the README quickstart, hybrid RRF+MMR, the three vector-index families vs exact, BM25 incl. CJK, graph + delete cascade, geo radius/bbox/nearest |
 | `docs/PLAN.md` | The binding's plan: architecture ruling, lifetime mapping, pointer discipline, phase scope |
@@ -187,7 +178,7 @@ this gate, not in a user's bug report.
 ## Versioning
 
 The engine pin lives in one variable in the fetch scripts
-(`CORVID_VERSION=v0.2.2`). Artifacts always come from that exact tag's
+(`CORVID_VERSION=v0.3.0`). Artifacts always come from that exact tag's
 GitHub release and are sha256-verified; `deps/` is never committed.
 
 ## License

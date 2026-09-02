@@ -10,11 +10,11 @@
 // matches by its bigrams — "城市" (city) matches both city notes,
 // "数据库" (database) matches the ML note.
 //
-// Note on phrase matching: the engine's native (Rust) API also has a
-// positional `phrase_search` (adjacent-token windows over stored
-// positions); this binding follows the C ABI v1, which exposes the
-// BM25 source only — positional semantics are beyond its surface;
-// this example shows the bag-of-words ranking that IS the contract.
+// Phrase matching: engine v0.3.0 added the DIRECT positional
+// `corvid_phrase_search` to the ABI (consecutive in-order analyzed
+// tokens, stop words collapsing out of adjacency), surfaced here as
+// (*Collection).PhraseSearch — Row.Score is the BM25 phrase sum, not
+// the builder's fused RRF scale.
 //
 // Run: go run ./examples/text-search   (after `make deps`)
 package main
@@ -55,6 +55,18 @@ func search(notes *corvid.Collection, query, label string) {
 	fmt.Println()
 }
 
+func phrase(notes *corvid.Collection, query, label string) {
+	rows, err := notes.PhraseSearch("body", query, 3)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%-28s ->", label)
+	for _, r := range rows {
+		fmt.Printf(" %s(%.6f)", r.Key, r.Score)
+	}
+	fmt.Println()
+}
+
 func main() {
 	db, err := corvid.OpenMemory()
 	if err != nil {
@@ -77,4 +89,8 @@ func main() {
 	search(notes, "quick dog", `bm25 "quick dog":`)
 	search(notes, "城市", "bm25 CJK 城市 (city):")
 	search(notes, "数据库", "bm25 CJK 数据库 (database):")
+
+	phrase(notes, "fox jumps over", `phrase "fox jumps over":`)
+	phrase(notes, "over jumps fox", `phrase "over jumps fox" (reversed — no match):`)
+	phrase(notes, "leaps over a sleeping", `phrase with stop words collapsed:`)
 }

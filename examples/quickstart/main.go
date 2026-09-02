@@ -47,8 +47,8 @@ func main() {
 	}))
 
 	// kNN: the 3 nearest documents to (1, 0) under cosine. Row.Doc is
-	// materialized only under Select (the v0.2.2 ABI has no map-key
-	// iterator) — select the field the printout needs.
+	// materialized only under Select — retrieval rows carry keys and
+	// scores, so select the field the printout needs.
 	rows, err := docs.Query().
 		Vector("v", []float32{1.0, 0.0}, 3, corvid.MetricCosine).
 		Select("title").
