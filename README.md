@@ -28,7 +28,7 @@ copied under the `libcorvid.dll.a` name so mingw-w64's `ld` finds it).
 Requirements stop at "a C compiler" — which cgo already needs.
 
 - **No Rust toolchain, ever.**
-- **One exact engine pin** — `v0.2.2`, living in one variable per fetch
+- **One exact engine pin** — `v0.3.0`, living in one variable per fetch
   script (`CORVID_VERSION` in `fetch.sh`, `$CorvidVersion` in
   `fetch.ps1`), stamped into `deps/version.txt`.
 - **No vendored binaries in git** (`deps/` is gitignored) and **no
@@ -42,7 +42,7 @@ Requirements: Go ≥ 1.26 (CI exercises 1.27.x and 1.26.x), a C compiler
 `shasum`/`sha256sum` (macOS/Linux) or PowerShell 5+ (Windows).
 
 ```sh
-make deps          # fetch + verify corvid v0.2.2 into deps/current
+make deps          # fetch + verify corvid v0.3.0 into deps/current
 go test ./...      # the golden suite (256 executable lines, 8 fixtures)
 ```
 
@@ -120,9 +120,9 @@ while another thread is inside a call on it is undefined behavior, and
 the binding's closed-handle gate (`checkOpen`) is TOCTOU by design, a
 loud rejection of use-after-close, not a lock.
 
-## Documents, maps, and the v0.2.2 ABI boundary
+## Documents, maps, and the v0.3.0 ABI boundary
 
-The v0.2.2 C ABI has **no map-key iterator** — a stored map is readable
+The v0.3.0 C ABI has **no map-key iterator** — a stored map is readable
 only by known key. Consequences in this binding (either-correct-or-
 loud, never silently truncated — details in
 [docs/PLAN.md](docs/PLAN.md#the-v1-boundary-map-key-enumeration)):
@@ -187,7 +187,7 @@ this gate, not in a user's bug report.
 ## Versioning
 
 The engine pin lives in one variable in the fetch scripts
-(`CORVID_VERSION=v0.2.2`). Artifacts always come from that exact tag's
+(`CORVID_VERSION=v0.3.0`). Artifacts always come from that exact tag's
 GitHub release and are sha256-verified; `deps/` is never committed.
 
 ## License

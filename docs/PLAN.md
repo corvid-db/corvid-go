@@ -40,7 +40,7 @@ Consequences, all locked:
   so the `#cgo` flags stay platform-independent; on Windows the MSVC import
   library is additionally copied under the `libcorvid.dll.a` name so
   mingw-w64's `ld` finds it via plain `-lcorvid`).
-- **Pin EXACT engine tags.** One engine version at a time; today `v0.2.2`.
+- **Pin EXACT engine tags.** One engine version at a time; today `v0.3.0`.
   The pin lives in exactly one variable per fetch script
   (`CORVID_VERSION` / `$CorvidVersion`) and is stamped into
   `deps/version.txt`.
@@ -155,7 +155,7 @@ The engine contract, restated as Go:
 
 ## The v1 boundary: map-key enumeration
 
-The C ABI (v0.2.2, 122 symbols) has **no map-key iterator** — `Value::Map`
+The C ABI (v0.3.0, 122 symbols) has **no map-key iterator** — `Value::Map`
 is readable only by known key (`corvid_value_map_get`; the engine's own FFI
 suite walks maps by expected keys with the length pinned — task-3 report,
 note 2). A Go API that returns `map[string]any` from `Get` therefore needs
