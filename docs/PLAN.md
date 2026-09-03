@@ -40,7 +40,7 @@ Consequences, all locked:
   so the `#cgo` flags stay platform-independent; on Windows the MSVC import
   library is additionally copied under the `libcorvid.dll.a` name so
   mingw-w64's `ld` finds it via plain `-lcorvid`).
-- **Pin EXACT engine tags.** One engine version at a time; today `v0.4.0`.
+- **Pin EXACT engine tags.** One engine version at a time; today `v0.4.1`.
   The pin lives in exactly one variable per fetch script
   (`CORVID_VERSION` / `$CorvidVersion`) and is stamped into
   `deps/version.txt`.
