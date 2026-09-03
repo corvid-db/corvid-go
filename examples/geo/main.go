@@ -52,6 +52,7 @@ func show(label string, hits []corvid.GeoHit, err error) {
 	fmt.Printf("%-34s [%s]\n", label, strings.Join(parts, " "))
 }
 
+// docs:begin:geo
 func main() {
 	db, err := corvid.OpenMemory()
 	if err != nil {
@@ -80,3 +81,5 @@ func main() {
 	hits, err = places.GeoNearest("loc", 52.52, 13.40, 2)
 	show("nearest 2 to Berlin:", hits, err)
 }
+
+// docs:end:geo

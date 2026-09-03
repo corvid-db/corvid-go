@@ -67,6 +67,7 @@ func phrase(notes *corvid.Collection, query, label string) {
 	fmt.Println()
 }
 
+// docs:begin:text_search
 func main() {
 	db, err := corvid.OpenMemory()
 	if err != nil {
@@ -94,3 +95,5 @@ func main() {
 	phrase(notes, "over jumps fox", `phrase "over jumps fox" (reversed — no match):`)
 	phrase(notes, "leaps over a sleeping", `phrase with stop words collapsed:`)
 }
+
+// docs:end:text_search

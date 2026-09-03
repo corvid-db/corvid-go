@@ -69,6 +69,7 @@ func runQuery(items *corvid.Collection, field string, approx bool, label string)
 	fmt.Println()
 }
 
+// docs:begin:vector_index
 func main() {
 	path := filepath.Join(os.TempDir(), "corvid-go-example-vector-index.redb")
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
@@ -117,3 +118,5 @@ func main() {
 
 	must(os.Remove(path))
 }
+
+// docs:end:vector_index

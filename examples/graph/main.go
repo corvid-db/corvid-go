@@ -37,6 +37,7 @@ func show(label string, keys [][]byte) {
 	fmt.Printf("%-36s [%s]\n", label, strings.Join(keysToStrs(keys), " "))
 }
 
+// docs:begin:graph
 func main() {
 	db, err := corvid.OpenMemory()
 	if err != nil {
@@ -121,3 +122,5 @@ func main() {
 		show("traverse(ga, 2 hops) after", tr)
 	}
 }
+
+// docs:end:graph
